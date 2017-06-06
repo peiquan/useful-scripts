@@ -1,0 +1,88 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+__author__ = 'zhupeiquan'
+
+import sys
+import click
+import commands
+from optparse import OptionParser
+
+
+class OutputInfo:
+    port = 0
+    pid = -2
+    cmd = ''
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return '(%s,%s,%s)' % (
+            self.port,
+            self.pid,
+            self.cmd
+        )
+    def __repr__(self):
+        return self.__str__();
+
+def get_pids_cmd(pid_list) :
+    command_str = 'ps -fp {0} -o pid,cmd |tail -n +2'.format(','.join(map(str,pid_list)))
+    (status, output) = commands.getstatusoutput(command_str)
+    dictMap = {}
+    if len(pid_list) < 1:
+        return dictMap
+    for line in output.splitlines():
+        dictMap[int(line[0:line.index(" ", 1)])] = line[line.index(" ",1):-1]
+    return dictMap
+
+def show_port_info(sport, eport):
+    """show tcp port info between sport and eport"""
+    command_str = "ss -nlpt sport \>= :" + str(sport) + " and sport \<= :" + str(eport) + "|tail -n +2|sed 's/:::/*:/g'|awk '{print $4,$6}'|cut -d ':' -f 2,3|sed 's/users://g'"
+    (status, output) = commands.getstatusoutput(command_str)
+    if status != 0:
+        print('execute error %s',output)
+        exit(1)
+
+    target_list = []
+    for line in output.split('\n'):
+        tmp = line.split()
+        outputObj = OutputInfo()
+        outputObj.port = int(tmp[0])
+        tmp_len = len(tmp)
+        pid = -1
+        if tmp_len > 1 :
+            info = tmp[1]
+            pid_index = info.index('pid=') + len('pid=')
+            comma_index = info.index(',',pid_index)
+            outputObj.pid = int(info[pid_index:comma_index])
+        else:
+            outputObj.pid = pid
+
+        # print(outputObj)
+        target_list.append(outputObj)
+
+    # print (target_list)
+
+    # 获取所有有效的 pid，进而获取 pid 对应的 cmd
+    pid_list = [obj.pid for obj in target_list if obj.pid > 0 ]
+    pidToCmdMap = get_pids_cmd(pid_list)
+    for target in target_list:
+        if pidToCmdMap.get(target.pid) is not None:
+            target.cmd = pidToCmdMap.get(target.pid)
+
+    # 输出表格
+    # print (target_list)
+    output_format = '%s\t%s\t%s'
+    print (output_format % ('port','pid','cmd'))
+    for target in target_list:
+        print (output_format % (target.port,target.pid,target.cmd))
+
+if __name__ == '__main__':
+    parse = OptionParser()
+    parse.add_option("-s","--start-port",action='store',type='int',dest='startPort',default='1')
+    parse.add_option("-e","--end-port",action='store',type='int',dest='endPort',default='65535')
+    (options,args) = parse.parse_args()
+    show_port_info(options.startPort,options.endPort)
+
+
