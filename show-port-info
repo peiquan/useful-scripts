@@ -31,7 +31,8 @@ def get_pids_cmd(pid_list) :
     if len(pid_list) < 1:
         return dictMap
     for line in output.splitlines():
-        dictMap[int(line[0:line.index(" ", 1)])] = line[line.index(" ",1):-1]
+        line = line.lstrip()
+        dictMap[int(line[0:line.index(" ")])] = line[line.index(" ",1):-1]
     return dictMap
 
 def show_port_info(sport, eport):
@@ -51,9 +52,13 @@ def show_port_info(sport, eport):
         pid = -1
         if tmp_len > 1 :
             info = tmp[1]
-            pid_index = info.index('pid=') + len('pid=')
-            comma_index = info.index(',',pid_index)
-            outputObj.pid = int(info[pid_index:comma_index])
+            first_comma_index = info.index(',') + 1
+            second_comma_index = info.index(',',first_comma_index)
+            tempPidStr = info[first_comma_index:second_comma_index]
+            if tempPidStr.index("=") > -1:
+                outputObj.pid = int(tempPidStr[tempPidStr.index('=')+1:-1])
+            else:
+                outputObj.pid = int(tempPidStr)
         else:
             outputObj.pid = pid
 
